@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>T-Shirts</title>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+    <script>
+    $(document).ready(function(){
+      $.ajax({
+        url: "http://127.0.0.1:5000/test",
+      }).done(function(data) {
+        $('.title').append(`<h1>${data.hello}</h1>`);
+      });
+    })
+    </script>
+  </head>
+  <body>
+    <div class="title">
+
+    </div>
+  </body>
+</html>
