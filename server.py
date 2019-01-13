@@ -1,60 +1,94 @@
 from flask import Flask, render_template, request, redirect, jsonify
 from flask_cors import CORS
-from bs4 import BeautifulSoup
 import Config
-import requests
+from requests_html import HTMLSession
 
 
 app = Flask(__name__)
 CORS(app)
 app.secret_key = 'shushmans'
 
-
 prepsportswear_categories = {
     # The Category Title: The Category ID
     'T-Shirts': '30',
-    'Sweatshirts': '305',
-    'Hats': '684',
-    'Applique': '1717',
-    'Men\'s': '29',
-    'Women\'s': '11',
-    'Youth': '89',
-    'Top Sellers': '183'
+    # 'Sweatshirts': '305',
+    # 'Hats': '684',
+    # 'Men': '29',
+    # 'Women': '11',
+    # 'Youth': '89',
+    # 'Top Sellers': '183'
 }
 
-data = {}
+jostens_categories = {
+    # The Category Title: The Category ID
+    'T-Shirts': 't-shirts',
+    # 'Sweatshirts': 'sweatshirts',
+    # 'Hats': 'hats',
+    # 'Men': 'mens',
+    # 'Women': 'womens',
+    # 'Youth': 'kids',
+    # 'Top Sellers': 'products'
+}
 
-#Consider moving method to a Util file
-def url_to_soup(url):
-    html = requests.get(url).content
-    soup = BeautifulSoup(html, 'html.parser')
-    return soup
+data = {
+    'T-Shirts': [],
+    'Sweatshirts': [],
+    'Hats': [],
+    'Men': [],
+    'Women': [],
+    'Youth': [],
+    'Top Sellers': []
+}
 
+for category_title, category_id in jostens_categories.items():
+    category_url = 'https://schoolstore.jostens.com/school/texas/frisco/reedy-high-school/' + category_id
+    category_session = HTMLSession()
+    category_response = category_session.get(category_url)
+    links = category_response.html.absolute_links
+
+    for link in links:
+        # if this link leads to a product
+        if '/product' in link:
+            product_session = HTMLSession()
+            product_response = product_session.get(link)
+            product_response.html.render()
+
+            product_title = product_response.html.find('a[href=' + link[39:] + ']', first=True).text
+            product_price = product_response.html.find('div.btdzn-add-to-cart-price', first=True).text
+            product_img_src = product_response.find('img.btdzn-link-img', first=True).attrs['src']
+            print(product_title)
+            data[category_title].append({'title': product_title,
+                                         'price': product_price,
+                                         'img_src': product_img_src,
+                                         'url': link})
 
 # Right now this iterates only through prepsportswear.com
 # In the future, this should be adapted to function for multiple sites
 
 for category_title, category_id in prepsportswear_categories.items():
     category_url = 'https://www.prepsportswear.com/school/us/Texas/Frisco/Rick-Reedy-High-School-Lions/productlist?schoolid=3208016&category=' + category_id
-    category_soup = url_to_soup(category_url)
-    data[category_title] = []
+    category_session = HTMLSession()
+    category_response = category_session.get(category_url)
+    links = category_response.html.absolute_links
 
-    for product in category_soup.find_all('a'):
-        href = product.get('href')
-        if href[0:8] == '/product':
-            product_soup = url_to_soup('https://www.prepsportswear.com' + href)
-            product_title = product_soup.find('h2').text
-            product_price = product_soup.find('span', {'class': 'priceContent'}).text
-            # Notably, the image is missing from the information being WebScraped
-            # This is an essential part of the original work and should be completed
-            data[category_title].append({'title': product_title, 'price': product_price})
+    for link in links:
+        if 'https://www.prepsportswear.com/product' in link:
+            product_session = HTMLSession()
+            product_response = product_session.get(link)
+            product_response.html.render()
+            product_title = product_response.html.find('h2', first=True).text
+            product_price = product_response.html.find('span.priceContent', first=True).text
+            product_img_src = product_response.html.find('img.productImage-Front', first=True).attrs['src']
+
+            data[category_title].append({'title': product_title,
+                                         'price': product_price,
+                                         'img_src': product_img_src,
+                                         'url': link})
 
 
 @app.route('/')
 def index():
-    # mainly used for testing
-    print(data)
-    return data.__repr__()
+    return "<h5>" + data.__repr__() + "</h5>"
 
 
 @app.route('/test')
@@ -64,16 +98,3 @@ def test():
 
 
 app.run(debug=Config.DEBUG)
-
-# {
-#     'hats': [
-#         {'product_title': 'a', 'product_price': '39', 'type': 'hat'},
-#         {'product_title': 'b', 'product_price': '79', 'type': 'hat'},
-#         {'product_title': 'c', 'product_price': '29', 'type', 'hat'}
-#     ],
-#     'shirts': [
-#         {'product_title': 'a', 'product_price': '39', 'type': 'hat'},
-#         {'product_title': 'b', 'product_price': '79', 'type': 'hat'},
-#         {'product_title': 'c', 'product_price': '29', 'type', 'hat'}
-#     ]
-# }
